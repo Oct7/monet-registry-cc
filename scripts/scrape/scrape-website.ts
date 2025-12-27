@@ -23,9 +23,49 @@ import type {
   FramerInfo,
 } from "./types";
 
-const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
+const VIEWPORTS = {
+  mobile: { width: 375, height: 812 },
+  tablet: { width: 768, height: 1024 },
+  desktop: { width: 1440, height: 900 },
+  wide: { width: 1920, height: 1080 },
+};
+
+const DEFAULT_VIEWPORT = VIEWPORTS.desktop;
 const DEFAULT_MAX_HEIGHT = 5400; // 뷰포트 높이의 6배
 const DEFAULT_WAIT_TIME = 3000;
+
+/**
+ * 실제 페이지 높이 감지
+ */
+async function getActualPageHeight(page: Page): Promise<number> {
+  return await page.evaluate(() => {
+    return Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight
+    );
+  });
+}
+
+/**
+ * Lazy-load 콘텐츠 트리거 (페이지 끝까지 스크롤)
+ */
+async function triggerLazyLoad(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) => {
+      let totalHeight = 0;
+      const distance = 500;
+      const timer = setInterval(() => {
+        window.scrollBy(0, distance);
+        totalHeight += distance;
+        if (totalHeight >= document.body.scrollHeight) {
+          clearInterval(timer);
+          window.scrollTo(0, 0);
+          resolve();
+        }
+      }, 100);
+    });
+  });
+}
 
 /**
  * URL에서 도메인 추출 및 정리
@@ -680,29 +720,37 @@ export async function scrapeWebsite(
 ): Promise<ScrapeResult> {
   const {
     url,
-    maxHeight = DEFAULT_MAX_HEIGHT,
+    maxHeight,
     waitTime = DEFAULT_WAIT_TIME,
     viewport = DEFAULT_VIEWPORT,
+    deviceScaleFactor = 1,
   } = options;
 
   // 도메인 추출 및 출력 디렉토리 생성
   const domain = extractDomain(url);
   const timestamp = new Date().toISOString().split("T")[0];
+  const viewportSuffix = options.viewportName && options.viewportName !== "desktop"
+    ? `-${options.viewportName}`
+    : "";
   const outputDir =
     options.outputDir ||
-    path.join(process.cwd(), `public/scraped/${domain}-${timestamp}`);
+    path.join(process.cwd(), `public/scraped/${domain}-${timestamp}${viewportSuffix}`);
 
   // 디렉토리 생성
   fs.mkdirSync(outputDir, { recursive: true });
   fs.mkdirSync(path.join(outputDir, "sections"), { recursive: true });
 
   console.log(`\n[Scraping] ${url}`);
+  console.log(`[Viewport] ${viewport.width}x${viewport.height}${deviceScaleFactor > 1 ? ` @${deviceScaleFactor}x` : ""}`);
   console.log(`[Output] ${outputDir}\n`);
 
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", `--window-size=${viewport.width},${viewport.height}`],
-    defaultViewport: viewport,
+    defaultViewport: {
+      ...viewport,
+      deviceScaleFactor,
+    },
   });
 
   try {
@@ -711,14 +759,26 @@ export async function scrapeWebsite(
     // 페이지 로드
     console.log("[1/8] Loading page...");
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await new Promise((r) => setTimeout(r, waitTime));
+
+    // 네트워크 안정화 대기
+    try {
+      await page.waitForNetworkIdle({ idleTime: 500, timeout: 10000 });
+    } catch {
+      // 타임아웃 시 fallback to waitTime
+      await new Promise((r) => setTimeout(r, waitTime));
+    }
+
+    // Lazy-load 콘텐츠 트리거
+    console.log("[1.5/8] Triggering lazy-loaded content...");
+    await triggerLazyLoad(page);
+    await new Promise((r) => setTimeout(r, 1000)); // 로딩 대기
 
     // 페이지 타이틀 추출
     const pageTitle = await page.title();
 
-    // 전체 페이지 높이 측정
-    const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
-    const captureHeight = Math.min(bodyHeight, maxHeight);
+    // 전체 페이지 높이 측정 (동적 감지)
+    const bodyHeight = await getActualPageHeight(page);
+    const captureHeight = maxHeight ? Math.min(bodyHeight, maxHeight) : bodyHeight;
 
     console.log(`[2/8] Taking full page screenshot (height: ${captureHeight}px)...`);
 
@@ -995,23 +1055,97 @@ export async function scrapeWebsite(
 async function main() {
   const args = process.argv.slice(2);
 
+  // --help 옵션 체크
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log("Usage: npx tsx scripts/scrape/scrape-website.ts --url <URL> [OPTIONS]");
+    console.log("\nOptions:");
+    console.log("  --url <URL>                    Target URL to scrape (required)");
+    console.log("  --output-dir <DIR>             Custom output directory (optional)");
+    console.log("  --viewport <TYPE>              Viewport size: mobile|tablet|desktop|wide|all (default: desktop)");
+    console.log("  --device-scale-factor <NUM>    Device pixel ratio for Retina screenshots (default: 1)");
+    console.log("  --max-height <NUM>             Maximum capture height in pixels (optional)");
+    console.log("\nViewport sizes:");
+    console.log("  mobile:  375x812");
+    console.log("  tablet:  768x1024");
+    console.log("  desktop: 1440x900");
+    console.log("  wide:    1920x1080");
+    console.log("  all:     Capture with all viewports");
+    console.log("\nExamples:");
+    console.log('  npx tsx scripts/scrape/scrape-website.ts --url "https://example.com"');
+    console.log('  npx tsx scripts/scrape/scrape-website.ts --url "https://example.com" --viewport mobile');
+    console.log('  npx tsx scripts/scrape/scrape-website.ts --url "https://example.com" --viewport all');
+    console.log('  npx tsx scripts/scrape/scrape-website.ts --url "https://example.com" --device-scale-factor 2');
+    process.exit(0);
+  }
+
   const urlIndex = args.indexOf("--url");
   const outputIndex = args.indexOf("--output-dir");
+  const viewportIndex = args.indexOf("--viewport");
+  const deviceScaleIndex = args.indexOf("--device-scale-factor");
+  const maxHeightIndex = args.indexOf("--max-height");
 
   if (urlIndex === -1 || !args[urlIndex + 1]) {
     console.error(
-      "Usage: npx tsx scripts/scrape/scrape-website.ts --url <URL> [--output-dir <DIR>]"
+      "Usage: npx tsx scripts/scrape/scrape-website.ts --url <URL> [OPTIONS]"
     );
-    console.error("\nOptions:");
-    console.error("  --url         Target URL to scrape (required)");
-    console.error("  --output-dir  Custom output directory (optional)");
+    console.error("\nRun with --help for more information");
     process.exit(1);
   }
 
   const url = args[urlIndex + 1];
   const outputDir = outputIndex !== -1 ? args[outputIndex + 1] : undefined;
+  const viewportName = viewportIndex !== -1 ? args[viewportIndex + 1] : "desktop";
+  const deviceScaleFactor = deviceScaleIndex !== -1 ? parseFloat(args[deviceScaleIndex + 1]) : 1;
+  const maxHeight = maxHeightIndex !== -1 ? parseInt(args[maxHeightIndex + 1]) : undefined;
 
-  const result = await scrapeWebsite({ url, outputDir });
+  // --viewport all인 경우 모든 뷰포트로 실행
+  if (viewportName === "all") {
+    console.log("\n[Multi-Viewport Mode] Scraping with all viewports...\n");
+
+    for (const [name, viewport] of Object.entries(VIEWPORTS)) {
+      console.log(`\n${"=".repeat(60)}`);
+      console.log(`Viewport: ${name} (${viewport.width}x${viewport.height})`);
+      console.log("=".repeat(60));
+
+      const vpOutputDir = outputDir
+        ? `${outputDir}-${name}`
+        : undefined;
+
+      const result = await scrapeWebsite({
+        url,
+        outputDir: vpOutputDir,
+        viewport,
+        viewportName: name,
+        deviceScaleFactor,
+        maxHeight,
+      });
+
+      if (!result.success) {
+        console.error(`\n[Error] Scraping failed for ${name}: ${result.error}`);
+      }
+    }
+
+    console.log(`\n${"=".repeat(60)}`);
+    console.log("All viewports completed!");
+    console.log("=".repeat(60));
+    return;
+  }
+
+  // 단일 뷰포트 모드
+  const viewport = VIEWPORTS[viewportName as keyof typeof VIEWPORTS] || DEFAULT_VIEWPORT;
+
+  if (!VIEWPORTS[viewportName as keyof typeof VIEWPORTS]) {
+    console.warn(`\nWarning: Unknown viewport "${viewportName}", using desktop (1440x900)`);
+  }
+
+  const result = await scrapeWebsite({
+    url,
+    outputDir,
+    viewport,
+    viewportName,
+    deviceScaleFactor,
+    maxHeight,
+  });
 
   if (!result.success) {
     console.error(`\n[Error] Scraping failed: ${result.error}`);

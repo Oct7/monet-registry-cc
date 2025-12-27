@@ -183,6 +183,93 @@ const itemVariants = {
 - Framer 사이트 컴포넌트는 반드시 `--tags-functional "animation"` 또는 `"scroll-animation"` 포함
 - `transition.ease`는 Framer의 값을 motion/react 형식으로 변환 (예: `easeOut` → `"easeOut"`)
 
+## 스크래핑 데이터 활용 가이드
+
+URL에서 스크래핑된 컴포넌트를 구현할 때, 다음 파일들을 참조하여 정확도를 높이세요:
+
+### 1. styles.json 활용
+스크래핑 디렉토리에 `styles.json`이 있다면, 계산된 CSS 스타일 정보를 참조하세요:
+```json
+{
+  "section.hero": {
+    "backgroundColor": "#1E3A3A",
+    "color": "#FFFFFF",
+    "fontFamily": "Inter, sans-serif",
+    "fontSize": "48px",
+    "padding": "80px 24px"
+  }
+}
+```
+- 색상 값을 이 파일에서 직접 가져오세요
+- 폰트 정보를 정확히 확인하세요
+- padding, margin 값을 참조하세요
+
+### 2. framer.json 활용
+Framer 사이트의 경우 `framer.json`에서 애니메이션 정보를 가져오세요:
+```json
+{
+  "animations": [
+    {
+      "type": "fade-up",
+      "target": "Hero Title",
+      "initial": { "opacity": 0, "y": 30 },
+      "animate": { "opacity": 1, "y": 0 },
+      "transition": { "duration": 0.6, "ease": "easeOut" }
+    }
+  ]
+}
+```
+- 이 값들을 그대로 motion/react 코드로 변환하세요
+- AI로 추정하지 말고 실제 데이터를 사용하세요
+
+### 3. fonts.json 활용
+```json
+{
+  "fonts": [
+    { "family": "Inter", "weights": ["400", "500", "700"], "source": "google-fonts" },
+    { "family": "Instrument Serif", "weights": ["400"], "source": "google-fonts" }
+  ]
+}
+```
+- 실제 사용된 폰트 목록 확인
+- @import URL 생성에 활용
+
+### 4. dom-tree.json 참조
+복잡한 레이아웃 구조 이해에 활용:
+- 중첩 구조 파악
+- flex/grid 레이아웃 방향 확인
+
+### 5. 구조화된 분석 출력
+
+이미지 분석 후 다음 JSON 형식으로 먼저 정리하세요:
+```json
+{
+  "layout": {
+    "type": "flex",
+    "direction": "column",
+    "gap": "24px",
+    "maxWidth": "1200px",
+    "padding": { "x": 24, "y": 80 }
+  },
+  "colors": {
+    "background": "#1E3A3A",
+    "text": "#FFFFFF",
+    "accent": "#E85C4A"
+  },
+  "typography": [
+    { "element": "h1", "family": "Inter", "weight": 700, "size": "48px", "lineHeight": 1.2 }
+  ],
+  "animations": [
+    { "target": "h1", "type": "fade-up", "delay": 0 }
+  ]
+}
+```
+
+### 주의사항
+- 스크래핑 데이터가 있으면 AI 추정보다 실제 데이터 우선
+- `/scraped/` 경로는 최종 컴포넌트에서 `/registry/{name}/`으로 변경
+- 하드코딩된 텍스트는 CONTENT 객체로 분리
+
 ## 주의사항:
 
 - 스크립트가 생성한 기본 파일 외에, 필요시 다음 파일을 추가할 수 있습니다:

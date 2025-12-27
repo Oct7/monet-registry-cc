@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import yaml from "js-yaml";
 import { z } from "zod/v4";
+import ts from "typescript";
 import {
   ComponentCategory,
   ComponentStatus,
@@ -81,11 +82,45 @@ const MetadataSchema = z.object({
   draft: z.boolean().optional(),
 });
 
+// 카테고리별 필수 태그
+const REQUIRED_TAGS_BY_CATEGORY: Record<string, string[]> = {
+  hero: ["layout"],
+  pricing: ["layout", "industry"],
+  testimonial: ["style"],
+  page: ["layout"],
+};
+
 interface ValidationResult {
   valid: boolean;
   component: string;
   errors: string[];
   warnings: string[];
+}
+
+/**
+ * TypeScript 컴파일 검증
+ */
+function validateTypeScript(indexPath: string): { valid: boolean; errors: string[] } {
+  if (!fs.existsSync(indexPath)) {
+    return { valid: false, errors: [`index.tsx not found`] };
+  }
+
+  const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, "tsconfig.json");
+  if (!configPath) {
+    return { valid: true, errors: [] }; // tsconfig 없으면 스킵
+  }
+
+  const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
+  const { options } = ts.parseJsonConfigFileContent(config, ts.sys, path.dirname(configPath));
+
+  const program = ts.createProgram([indexPath], { ...options, noEmit: true });
+  const diagnostics = ts.getPreEmitDiagnostics(program);
+
+  const errors = diagnostics
+    .filter(d => d.category === ts.DiagnosticCategory.Error)
+    .map(d => ts.flattenDiagnosticMessageText(d.messageText, "\n"));
+
+  return { valid: errors.length === 0, errors };
 }
 
 function validateMetadataFile(filePath: string): ValidationResult {
@@ -181,6 +216,29 @@ function validateMetadataFile(filePath: string): ValidationResult {
       );
     }
 
+    // 이미지 파일 존재 검증
+    const publicDir = path.join(process.cwd(), "public");
+    const previewPath = path.join(publicDir, metadata.images.preview);
+
+    if (!fs.existsSync(previewPath)) {
+      result.errors.push(`Preview image not found: ${metadata.images.preview}`);
+      result.valid = false;
+    }
+
+    if (metadata.images.thumbnail) {
+      const thumbnailPath = path.join(publicDir, metadata.images.thumbnail);
+      if (!fs.existsSync(thumbnailPath)) {
+        result.warnings.push(`Thumbnail image not found: ${metadata.images.thumbnail}`);
+      }
+    }
+
+    // scraped 경로 경고
+    if (metadata.images.preview.includes('/scraped/')) {
+      result.warnings.push(
+        `Preview uses scraped path. Consider moving to /registry/${componentName}/`
+      );
+    }
+
     // Framer source type 검증
     const sourceData = data.source as { type?: string; framer?: unknown } | undefined;
     if (sourceData?.type === "framer") {
@@ -230,6 +288,30 @@ function validateMetadataFile(filePath: string): ValidationResult {
         );
       }
     }
+
+    // TypeScript 컴파일 검증
+    const registryDir = path.join(process.cwd(), "src/components/registry");
+    const indexPath = path.join(registryDir, componentName, "index.tsx");
+    const tsResult = validateTypeScript(indexPath);
+    if (!tsResult.valid) {
+      result.errors.push(...tsResult.errors.map(e => `TypeScript: ${e}`));
+      result.valid = false;
+    }
+
+    // 필수 태그 검증 (카테고리별)
+    if (metadata.category && REQUIRED_TAGS_BY_CATEGORY[metadata.category]) {
+      const required = REQUIRED_TAGS_BY_CATEGORY[metadata.category];
+      const missing = required.filter(tagType => {
+        const tags = metadata.tags?.[tagType as keyof typeof metadata.tags];
+        return !tags || tags.length === 0;
+      });
+
+      if (missing.length > 0) {
+        result.warnings.push(
+          `Category "${metadata.category}" recommends tags: ${missing.join(', ')}`
+        );
+      }
+    }
   } catch (e) {
     result.valid = false;
     result.errors.push(`Failed to parse YAML: ${(e as Error).message}`);
@@ -239,6 +321,15 @@ function validateMetadataFile(filePath: string): ValidationResult {
 }
 
 async function main() {
+  // CLI 옵션 파싱
+  const args = process.argv.slice(2);
+  const strictMode = args.includes('--strict');
+  const fixMode = args.includes('--fix');
+
+  if (fixMode) {
+    console.log("\n⚠️  --fix mode is not yet implemented\n");
+  }
+
   const registryDir = path.join(process.cwd(), "src/components/registry");
 
   const componentDirs = fs
@@ -287,6 +378,9 @@ async function main() {
 
   // 결과 출력
   console.log("\n=== Validation Results ===\n");
+  if (strictMode) {
+    console.log("🔒 STRICT MODE: Warnings treated as errors\n");
+  }
 
   // 에러 출력
   const withErrors = allResults.filter((r) => r.errors.length > 0);
@@ -302,7 +396,8 @@ async function main() {
   // 경고 출력 (처음 10개만)
   const withWarnings = allResults.filter((r) => r.warnings.length > 0);
   if (withWarnings.length > 0) {
-    console.log(`WARNINGS (showing first 10 of ${withWarnings.length}):`);
+    const label = strictMode ? "WARNINGS (treated as errors)" : "WARNINGS";
+    console.log(`${label} (showing first 10 of ${withWarnings.length}):`);
     for (const result of withWarnings.slice(0, 10)) {
       console.log(`  [${result.component}]`);
       result.warnings.forEach((w) => console.log(`    - ${w}`));
@@ -351,6 +446,12 @@ async function main() {
 
   // 실패 시 exit code 1
   if (invalid > 0) {
+    process.exit(1);
+  }
+
+  // strict 모드: 경고도 실패로 처리
+  if (strictMode && withWarnings.length > 0) {
+    console.log("\n❌ Failed due to warnings in strict mode");
     process.exit(1);
   }
 }

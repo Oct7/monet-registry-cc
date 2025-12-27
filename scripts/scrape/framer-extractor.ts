@@ -10,7 +10,106 @@ import type {
   FramerElementInfo,
   FramerAnimationPattern,
   FramerInfo,
+  AnimationType,
 } from "./types";
+
+// ============================================
+// Transform 파싱
+// ============================================
+
+interface TransformValues {
+  translateX?: number;
+  translateY?: number;
+  translateZ?: number;
+  scale?: number;
+  scaleX?: number;
+  scaleY?: number;
+  rotate?: number;
+  rotateX?: number;
+  rotateY?: number;
+  skewX?: number;
+  skewY?: number;
+}
+
+/**
+ * CSS transform 문자열을 파싱하여 개별 값으로 분해
+ */
+function parseTransform(transform: string): TransformValues {
+  const values: TransformValues = {};
+  const regex = /(\w+)\(([^)]+)\)/g;
+  let match;
+
+  while ((match = regex.exec(transform)) !== null) {
+    const [, prop, value] = match;
+    const numValue = parseFloat(value);
+
+    switch (prop) {
+      case "translateX":
+        values.translateX = numValue;
+        break;
+      case "translateY":
+        values.translateY = numValue;
+        break;
+      case "translateZ":
+        values.translateZ = numValue;
+        break;
+      case "scale":
+        values.scale = numValue;
+        break;
+      case "scaleX":
+        values.scaleX = numValue;
+        break;
+      case "scaleY":
+        values.scaleY = numValue;
+        break;
+      case "rotate":
+        values.rotate = numValue;
+        break;
+      case "rotateX":
+        values.rotateX = numValue;
+        break;
+      case "rotateY":
+        values.rotateY = numValue;
+        break;
+      case "skewX":
+        values.skewX = numValue;
+        break;
+      case "skewY":
+        values.skewY = numValue;
+        break;
+    }
+  }
+
+  return values;
+}
+
+// ============================================
+// Transition 파싱
+// ============================================
+
+interface TransitionPart {
+  property: string;
+  duration: number;
+  easing: string;
+  delay?: number;
+}
+
+/**
+ * CSS transition 문자열을 파싱하여 개별 transition으로 분해
+ */
+function parseTransitions(str: string): TransitionPart[] {
+  if (!str || str === "all 0s ease 0s") return [];
+
+  return str.split(",").map((part) => {
+    const [property, duration, easing, delay] = part.trim().split(/\s+/);
+    return {
+      property: property || "all",
+      duration: parseFloat(duration) || 0.3,
+      easing: easing?.replace(/-/g, "") || "ease",
+      delay: delay ? parseFloat(delay) : undefined,
+    };
+  });
+}
 
 /**
  * Framer 사이트 감지
@@ -144,33 +243,85 @@ function detectPattern(
     animate.opacity = 1;
   }
 
-  // Transform 분석
+  // Transform 분석 (새로운 parseTransform 함수 사용)
   if (el.initialTransform) {
-    const translateY = el.initialTransform.match(/translateY\(([^)]+)\)/);
-    const translateX = el.initialTransform.match(/translateX\(([^)]+)\)/);
-    const scale = el.initialTransform.match(/scale\(([^)]+)\)/);
+    const transform = parseTransform(el.initialTransform);
 
-    if (translateY) {
-      initial.y = parseFloat(translateY[1]);
+    if (transform.translateY !== undefined) {
+      initial.y = transform.translateY;
       animate.y = 0;
     }
-    if (translateX) {
-      initial.x = parseFloat(translateX[1]);
+    if (transform.translateX !== undefined) {
+      initial.x = transform.translateX;
       animate.x = 0;
     }
-    if (scale) {
-      initial.scale = parseFloat(scale[1]);
+    if (transform.translateZ !== undefined) {
+      initial.z = transform.translateZ;
+      animate.z = 0;
+    }
+    if (transform.scale !== undefined) {
+      initial.scale = transform.scale;
       animate.scale = 1;
+    }
+    if (transform.scaleX !== undefined) {
+      initial.scaleX = transform.scaleX;
+      animate.scaleX = 1;
+    }
+    if (transform.scaleY !== undefined) {
+      initial.scaleY = transform.scaleY;
+      animate.scaleY = 1;
+    }
+    if (transform.rotate !== undefined) {
+      initial.rotate = transform.rotate;
+      animate.rotate = 0;
+    }
+    if (transform.rotateX !== undefined) {
+      initial.rotateX = transform.rotateX;
+      animate.rotateX = 0;
+    }
+    if (transform.rotateY !== undefined) {
+      initial.rotateY = transform.rotateY;
+      animate.rotateY = 0;
+    }
+    if (transform.skewX !== undefined) {
+      initial.skewX = transform.skewX;
+      animate.skewX = 0;
+    }
+    if (transform.skewY !== undefined) {
+      initial.skewY = transform.skewY;
+      animate.skewY = 0;
     }
   }
 
+  // Blur 효과 감지 (filter: blur() 사용 가능한 경우)
+  // 참고: initialTransform에 blur가 있을 수 있으나, 보통 filter 속성에서 처리됨
+  // 여기서는 간단히 blur-in을 opacity + scale 조합으로 추론
+
   if (Object.keys(initial).length === 0) return null;
 
-  // 패턴 타입 결정
-  let type: FramerAnimationPattern["type"] = "fade-in";
-  if ("y" in initial && "opacity" in initial) type = "fade-up";
-  else if ("x" in initial) type = "slide-in";
-  else if ("scale" in initial) type = "scale-in";
+  // 패턴 타입 결정 (확장된 버전)
+  let type: AnimationType = "fade-in";
+
+  // fade-up: translateY < 0 (아래에서 위로) + opacity
+  // fade-down: translateY > 0 (위에서 아래로) + opacity
+  // fade-left: translateX > 0 (오른쪽에서 왼쪽으로) + opacity
+  // fade-right: translateX < 0 (왼쪽에서 오른쪽으로) + opacity
+  if ("y" in initial && "opacity" in initial) {
+    type = (initial.y as number) > 0 ? "fade-down" : "fade-up";
+  } else if ("x" in initial && "opacity" in initial) {
+    type = (initial.x as number) > 0 ? "fade-left" : "fade-right";
+  } else if ("x" in initial) {
+    type = "slide-in";
+  } else if ("scale" in initial && (initial.scale as number) < 1) {
+    type = "scale-in";
+  } else if ("scale" in initial && (initial.scale as number) > 1) {
+    type = "scale-out";
+  } else if ("rotate" in initial || "rotateX" in initial || "rotateY" in initial) {
+    type = "rotate-in";
+  } else if ("opacity" in initial && "scale" in initial && (initial.scale as number) < 1) {
+    // blur-in 효과는 보통 opacity + scale 조합으로 구현됨
+    type = "blur-in";
+  }
 
   // Transition 파싱
   const transition = parseTransition(el.transition);
@@ -224,38 +375,39 @@ export async function extractFramerCssVariables(
 }
 
 /**
- * Framer 레이어명 → 카테고리 매핑
+ * 다국어 카테고리 매핑
+ */
+const MULTILANG_CATEGORY_MAP: Record<string, string[]> = {
+  hero: ["hero", "히어로", "ヒーロー", "英雄", "bannière"],
+  header: ["header", "nav", "navigation", "헤더", "ヘッダー", "导航", "navbar"],
+  footer: ["footer", "푸터", "フッター", "页脚"],
+  pricing: ["pricing", "price", "가격", "料金", "价格", "plan", "plans"],
+  testimonial: [
+    "testimonial",
+    "review",
+    "후기",
+    "レビュー",
+    "评价",
+    "reviews",
+  ],
+  faq: ["faq", "질문", "よくある質問", "常见问题", "question", "questions"],
+  cta: ["cta", "call-to-action", "행동유도"],
+  contact: ["contact", "연락", "お問い合わせ", "联系"],
+  feature: ["feature", "features", "기능", "機能", "功能"],
+  stats: ["stats", "statistics", "통계", "統計", "统计"],
+  "logo-cloud": ["logo", "logos", "partner", "partners", "client", "clients"],
+  team: ["team", "people", "팀", "チーム", "团队"],
+  "how-it-works": ["how-it-works", "process", "steps", "workflow"],
+};
+
+/**
+ * Framer 레이어명 → 카테고리 매핑 (다국어 지원)
  */
 export function inferCategoryFromFramerName(framerName: string): string | null {
-  const nameMap: Record<string, string> = {
-    hero: "hero",
-    navigation: "header",
-    nav: "header",
-    navbar: "header",
-    header: "header",
-    footer: "footer",
-    pricing: "pricing",
-    feature: "feature",
-    features: "feature",
-    testimonial: "testimonial",
-    testimonials: "testimonial",
-    faq: "faq",
-    cta: "cta",
-    contact: "contact",
-    stats: "stats",
-    logos: "logo-cloud",
-    partners: "logo-cloud",
-    clients: "logo-cloud",
-    team: "team",
-    about: "biography",
-    "how-it-works": "how-it-works",
-    process: "how-it-works",
-    steps: "how-it-works",
-  };
-
   const lowerName = framerName.toLowerCase();
-  for (const [key, category] of Object.entries(nameMap)) {
-    if (lowerName.includes(key)) {
+
+  for (const [category, keywords] of Object.entries(MULTILANG_CATEGORY_MAP)) {
+    if (keywords.some((kw) => lowerName.includes(kw.toLowerCase()))) {
       return category;
     }
   }

@@ -105,6 +105,8 @@ export interface ScrapeOptions {
     width: number;
     height: number;
   };
+  viewportName?: string; // 뷰포트 이름 (mobile, tablet, desktop, wide, all)
+  deviceScaleFactor?: number; // Retina 스크린샷 배율 (기본: 1)
 }
 
 export interface ScrapeResult {
@@ -238,8 +240,21 @@ export interface FramerElementInfo {
   animation?: string;
 }
 
+export type AnimationType =
+  | "fade-up"
+  | "fade-down"
+  | "fade-left"
+  | "fade-right"
+  | "fade-in"
+  | "scale-in"
+  | "scale-out"
+  | "rotate-in"
+  | "blur-in"
+  | "slide-in"
+  | "stagger";
+
 export interface FramerAnimationPattern {
-  type: "fade-up" | "fade-in" | "scale-in" | "slide-in" | "stagger";
+  type: AnimationType;
   target: string;
   initial: Record<string, number | string>;
   animate: Record<string, number | string>;
