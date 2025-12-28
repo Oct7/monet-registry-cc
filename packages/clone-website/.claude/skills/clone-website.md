@@ -9,26 +9,32 @@ description: 웹사이트 URL을 입력받아 React/Tailwind 프로젝트로 클
 
 ## 사용법
 
-### 1. 웹사이트 스크래핑
+### 한 번에 클론 (권장)
 
 ```bash
-npx @anthropic/clone-website scrape https://example.com
-```
+# URL만 입력하면 스크래핑 + 프로젝트 생성까지 한번에!
+npx @anthropic/clone-website clone https://stripe.com
 
-옵션:
-- `-o, --output <dir>`: 출력 디렉토리
-- `-v, --viewport <type>`: mobile|tablet|desktop|wide|all
-- `-s, --scale <factor>`: Retina 스크린샷 배율 (1 또는 2)
+# 프로젝트명 지정
+npx @anthropic/clone-website clone https://stripe.com my-stripe
 
-### 2. 프로젝트 생성
-
-```bash
-npx @anthropic/clone-website create https://stripe.com my-saas-landing
+# 의존성 설치까지 자동
+npx @anthropic/clone-website clone https://stripe.com --install
 ```
 
 옵션:
 - `-o, --output <dir>`: 출력 디렉토리
 - `-t, --template <type>`: nextjs|vite|remix
+- `-v, --viewport <type>`: mobile|tablet|desktop|wide|all
+- `-s, --scale <factor>`: Retina 스크린샷 배율 (1 또는 2)
+- `--install`: pnpm install 자동 실행
+- `--no-lazy-load`: Lazy-load 트리거 비활성화
+
+### 스크래핑만 수행 (선택)
+
+```bash
+npx @anthropic/clone-website scrape https://example.com -o ./scraped
+```
 
 ## 워크플로우
 
@@ -81,12 +87,14 @@ scraped/{domain}-{date}/
 ## 예시
 
 ```bash
-# Stripe 랜딩페이지 클론
-npx @anthropic/clone-website create https://stripe.com my-stripe-clone -t nextjs
+# Stripe 랜딩페이지 클론 (가장 간단한 방법)
+npx @anthropic/clone-website clone https://stripe.com
 
-# 결과
-cd my-stripe-clone
-pnpm install
+# Next.js 템플릿으로 클론 + 의존성 자동 설치
+npx @anthropic/clone-website clone https://stripe.com -t nextjs --install
+
+# 결과 (--install 사용 시)
+cd stripe-com-clone
 pnpm dev
 ```
 

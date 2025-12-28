@@ -14,28 +14,38 @@ pnpm add -g @anthropic/clone-website
 
 ## 빠른 시작
 
-### 웹사이트를 새 프로젝트로 클론
+### 웹사이트 클론 (가장 간단한 방법)
 
 ```bash
-npx @anthropic/clone-website create https://stripe.com my-saas-landing
+# URL만 입력하면 끝!
+npx @anthropic/clone-website clone https://stripe.com
+
+# 프로젝트명 지정
+npx @anthropic/clone-website clone https://stripe.com my-saas
+
+# 의존성 설치까지 자동
+npx @anthropic/clone-website clone https://stripe.com --install
 ```
 
 결과:
 ```
+🚀 Cloning https://stripe.com → stripe-com-clone
+
+✔ Scraping complete!
 ✔ Project created!
 
-Your new project is ready:
-  ./my-saas-landing
+✨ Your new project is ready:
+  ./stripe-com-clone
 
 Next steps:
-  $ cd my-saas-landing
+  $ cd stripe-com-clone
   $ pnpm install
   $ pnpm dev
 
 Components generated: 8
-  - my-saas-landing-header-0
-  - my-saas-landing-hero-1
-  - my-saas-landing-feature-2
+  • stripe-com-clone-header-0
+  • stripe-com-clone-hero-1
+  • stripe-com-clone-feature-2
   ...
 ```
 
@@ -62,19 +72,23 @@ clone-website scrape https://example.com [options]
 | `-s, --scale <factor>` | Retina 배율 (1 또는 2) | `1` |
 | `--no-lazy-load` | Lazy-load 트리거 비활성화 | - |
 
-### `create <url> <name>`
+### `clone <url> [name]`
 
-웹사이트를 클론하여 새 프로젝트를 생성합니다.
+웹사이트를 스크래핑하고 바로 새 프로젝트로 생성합니다. **가장 권장되는 명령어입니다.**
 
 ```bash
-clone-website create https://stripe.com my-project [options]
+clone-website clone https://stripe.com [options]
+clone-website clone https://stripe.com my-project [options]
 ```
 
 | 옵션 | 설명 | 기본값 |
 |------|------|--------|
 | `-o, --output <dir>` | 출력 디렉토리 | `.` |
 | `-t, --template <type>` | 템플릿: nextjs\|vite\|remix | `vite` |
-| `-v, --viewport <type>` | 뷰포트 | `desktop` |
+| `-v, --viewport <type>` | 뷰포트: mobile\|tablet\|desktop\|wide\|all | `desktop` |
+| `-s, --scale <factor>` | Retina 배율 (1 또는 2) | `2` |
+| `--no-lazy-load` | Lazy-load 트리거 비활성화 | - |
+| `--install` | pnpm install 자동 실행 | - |
 
 ## 프로그래매틱 사용
 

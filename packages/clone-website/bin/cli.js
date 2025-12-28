@@ -61,12 +61,25 @@ program
   });
 
 program
-  .command('create <url> <name>')
-  .description('Clone a website and create a new project')
+  .command('clone <url> [name]')
+  .description('Clone a website to a new React project (scrape + generate in one step)')
   .option('-o, --output <dir>', 'Output directory', '.')
   .option('-t, --template <type>', 'Template: nextjs|vite|remix', 'vite')
-  .option('-v, --viewport <type>', 'Viewport: mobile|tablet|desktop|wide', 'desktop')
+  .option('-v, --viewport <type>', 'Viewport: mobile|tablet|desktop|wide|all', 'desktop')
+  .option('-s, --scale <factor>', 'Device scale factor for Retina', '2')
+  .option('--no-lazy-load', 'Disable lazy-load triggering')
+  .option('--install', 'Run pnpm install after creation')
   .action(async (url, name, options) => {
+    // Auto-generate name from URL if not provided
+    if (!name) {
+      try {
+        const urlObj = new URL(url);
+        name = urlObj.hostname.replace(/^www\./, '').replace(/\./g, '-') + '-clone';
+      } catch {
+        name = 'website-clone';
+      }
+    }
+    console.log(chalk.bold(`\n🚀 Cloning ${chalk.cyan(url)} → ${chalk.green(name)}\n`));
     const spinner = ora('Scraping website...').start();
 
     try {
@@ -74,6 +87,8 @@ program
       const scrapeResult = await scrapeWebsite({
         url,
         viewportName: options.viewport,
+        deviceScaleFactor: parseFloat(options.scale),
+        triggerLazyLoad: options.lazyLoad,
       });
 
       if (!scrapeResult.success) {
@@ -94,19 +109,38 @@ program
 
       if (projectResult.success) {
         spinner.succeed(chalk.green('Project created!'));
+
+        // Auto-install if --install flag
+        if (options.install) {
+          const installSpinner = ora('Installing dependencies...').start();
+          const { execSync } = await import('child_process');
+          try {
+            execSync('pnpm install', {
+              cwd: projectResult.projectDir,
+              stdio: 'pipe'
+            });
+            installSpinner.succeed(chalk.green('Dependencies installed!'));
+          } catch {
+            installSpinner.warn(chalk.yellow('Install failed - run pnpm install manually'));
+          }
+        }
+
         console.log('');
-        console.log(chalk.bold('Your new project is ready:'));
+        console.log(chalk.bold('✨ Your new project is ready:'));
         console.log(`  ${chalk.cyan(projectResult.projectDir)}`);
         console.log('');
-        console.log('Next steps:');
+        console.log(chalk.bold('Next steps:'));
         console.log(`  ${chalk.dim('$')} cd ${name}`);
-        console.log(`  ${chalk.dim('$')} pnpm install`);
+        if (!options.install) {
+          console.log(`  ${chalk.dim('$')} pnpm install`);
+        }
         console.log(`  ${chalk.dim('$')} pnpm dev`);
         console.log('');
-        console.log(`Components generated: ${chalk.yellow(projectResult.components.length)}`);
+        console.log(chalk.bold(`Components generated: ${chalk.yellow(projectResult.components.length)}`));
         projectResult.components.forEach(c => {
-          console.log(`  - ${c}`);
+          console.log(`  ${chalk.dim('•')} ${c}`);
         });
+        console.log('');
       } else {
         spinner.fail(chalk.red('Project generation failed'));
         console.error(projectResult.error);
