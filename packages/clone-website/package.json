@@ -1,0 +1,66 @@
+{
+  "name": "@anthropic/clone-website",
+  "version": "0.1.0",
+  "description": "Clone any website to React/Tailwind components using AI",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "clone-website": "./bin/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./scrape": {
+      "types": "./dist/scrape/index.d.ts",
+      "import": "./dist/scrape/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "puppeteer": "^24.0.0",
+    "js-yaml": "^4.1.0",
+    "commander": "^12.0.0",
+    "ora": "^8.0.0",
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "website-clone",
+    "react",
+    "tailwind",
+    "puppeteer",
+    "scraping",
+    "ai",
+    "claude",
+    "framer"
+  ],
+  "author": "Anthropic",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/clone-website"
+  }
+}
