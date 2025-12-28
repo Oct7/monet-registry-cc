@@ -1,4 +1,4 @@
-# @anthropic/clone-website
+# @oct7/clone-website
 
 > Clone any website to React/Tailwind components using AI
 
@@ -7,9 +7,9 @@
 ## 설치
 
 ```bash
-npm install -g @anthropic/clone-website
+npm install -g @oct7/clone-website
 # 또는
-pnpm add -g @anthropic/clone-website
+pnpm add -g @oct7/clone-website
 ```
 
 ## 빠른 시작
@@ -18,13 +18,13 @@ pnpm add -g @anthropic/clone-website
 
 ```bash
 # URL만 입력하면 끝!
-npx @anthropic/clone-website clone https://stripe.com
+npx @oct7/clone-website clone https://stripe.com
 
 # 프로젝트명 지정
-npx @anthropic/clone-website clone https://stripe.com my-saas
+npx @oct7/clone-website clone https://stripe.com my-saas
 
 # 의존성 설치까지 자동
-npx @anthropic/clone-website clone https://stripe.com --install
+npx @oct7/clone-website clone https://stripe.com --install
 ```
 
 결과:
@@ -52,7 +52,7 @@ Components generated: 8
 ### 스크래핑만 수행
 
 ```bash
-npx @anthropic/clone-website scrape https://example.com -o ./scraped
+npx @oct7/clone-website scrape https://example.com -o ./scraped
 ```
 
 ## CLI 명령어
@@ -93,7 +93,7 @@ clone-website clone https://stripe.com my-project [options]
 ## 프로그래매틱 사용
 
 ```typescript
-import { scrapeWebsite, generateProject } from '@anthropic/clone-website';
+import { scrapeWebsite, generateProject } from '@oct7/clone-website';
 
 // 스크래핑
 const scrapeResult = await scrapeWebsite({
@@ -193,4 +193,4 @@ my-project/
 
 ## 라이선스
 
-MIT © Anthropic
+MIT © Oct7

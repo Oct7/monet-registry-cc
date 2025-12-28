@@ -13,13 +13,13 @@ description: 웹사이트 URL을 입력받아 React/Tailwind 프로젝트로 클
 
 ```bash
 # URL만 입력하면 스크래핑 + 프로젝트 생성까지 한번에!
-npx @anthropic/clone-website clone https://stripe.com
+npx @oct7/clone-website clone https://stripe.com
 
 # 프로젝트명 지정
-npx @anthropic/clone-website clone https://stripe.com my-stripe
+npx @oct7/clone-website clone https://stripe.com my-stripe
 
 # 의존성 설치까지 자동
-npx @anthropic/clone-website clone https://stripe.com --install
+npx @oct7/clone-website clone https://stripe.com --install
 ```
 
 옵션:
@@ -33,7 +33,7 @@ npx @anthropic/clone-website clone https://stripe.com --install
 ### 스크래핑만 수행 (선택)
 
 ```bash
-npx @anthropic/clone-website scrape https://example.com -o ./scraped
+npx @oct7/clone-website scrape https://example.com -o ./scraped
 ```
 
 ## 워크플로우
@@ -88,10 +88,10 @@ scraped/{domain}-{date}/
 
 ```bash
 # Stripe 랜딩페이지 클론 (가장 간단한 방법)
-npx @anthropic/clone-website clone https://stripe.com
+npx @oct7/clone-website clone https://stripe.com
 
 # Next.js 템플릿으로 클론 + 의존성 자동 설치
-npx @anthropic/clone-website clone https://stripe.com -t nextjs --install
+npx @oct7/clone-website clone https://stripe.com -t nextjs --install
 
 # 결과 (--install 사용 시)
 cd stripe-com-clone

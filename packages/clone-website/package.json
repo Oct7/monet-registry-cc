@@ -1,5 +1,5 @@
 {
-  "name": "@anthropic/clone-website",
+  "name": "@oct7/clone-website",
   "version": "0.1.0",
   "description": "Clone any website to React/Tailwind components using AI",
   "type": "module",
@@ -57,10 +57,10 @@
     "claude",
     "framer"
   ],
-  "author": "Anthropic",
+  "author": "Oct7",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anthropics/clone-website"
+    "url": "https://github.com/oct7/clone-website"
   }
 }
