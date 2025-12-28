@@ -6,6 +6,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { ScrapeResult } from '../scrape/types.js';
 import { generateComponent } from './component.js';
+import type { ContentConfig } from '../content/types.js';
+import {
+  generateContentObject,
+  generateSiteMetadata,
+  generateThemeCSSVariables,
+  applyTextReplacements,
+} from '../content/applier.js';
 
 export type ProjectTemplate = 'nextjs' | 'vite' | 'remix';
 
@@ -15,6 +22,8 @@ export interface ProjectOptions {
   template: ProjectTemplate;
   scrapeResult: ScrapeResult;
   includeAllSections?: boolean;
+  /** Custom content configuration */
+  contentConfig?: ContentConfig | null;
 }
 
 export interface ProjectResult {
@@ -143,6 +152,7 @@ export async function generateProject(options: ProjectOptions): Promise<ProjectR
     template,
     scrapeResult,
     includeAllSections = true,
+    contentConfig,
   } = options;
 
   const projectDir = path.join(outputDir, name);
@@ -175,7 +185,25 @@ export async function generateProject(options: ProjectOptions): Promise<ProjectR
     // Tailwind 설정
     fs.writeFileSync(path.join(projectDir, 'tailwind.config.js'), generateTailwindConfig());
     fs.writeFileSync(path.join(projectDir, 'postcss.config.js'), generatePostcssConfig());
-    fs.writeFileSync(path.join(projectDir, 'src', 'globals.css'), generateGlobalCss());
+
+    // Global CSS with theme variables if content config has theme
+    let globalCss = generateGlobalCss();
+    if (contentConfig?.theme) {
+      const themeVars = generateThemeCSSVariables(contentConfig.theme);
+      if (themeVars) {
+        globalCss += '\n' + themeVars + '\n';
+      }
+    }
+    fs.writeFileSync(path.join(projectDir, 'src', 'globals.css'), globalCss);
+
+    // Site config if content config has site metadata
+    if (contentConfig?.site) {
+      const siteConfig = generateSiteMetadata(contentConfig);
+      fs.writeFileSync(
+        path.join(projectDir, 'src', 'site-config.ts'),
+        siteConfig
+      );
+    }
 
     // tsconfig.json
     fs.writeFileSync(path.join(projectDir, 'tsconfig.json'), JSON.stringify({
@@ -208,6 +236,15 @@ export async function generateProject(options: ProjectOptions): Promise<ProjectR
       const componentName = `${name}-${section.category || 'section'}-${section.index}`;
       const sectionImage = path.join(scrapeResult.outputDir, 'sections', `section-${section.index}.png`);
 
+      // Generate content object for this section if contentConfig exists
+      const sectionContentCode = contentConfig
+        ? generateContentObject({
+            config: contentConfig,
+            sectionCategory: section.category,
+            sectionIndex: section.index,
+          })
+        : undefined;
+
       const result = await generateComponent({
         name: componentName,
         outputDir: path.join(projectDir, 'src', 'components'),
@@ -216,6 +253,8 @@ export async function generateProject(options: ProjectOptions): Promise<ProjectR
         fonts: scrapeResult.fonts,
         sourceUrl: scrapeResult.metadata.url,
         sectionIndex: section.index,
+        customContent: sectionContentCode,
+        textReplacements: contentConfig?.textReplacements,
       });
 
       if (result.success) {
@@ -224,6 +263,10 @@ export async function generateProject(options: ProjectOptions): Promise<ProjectR
     }
 
     // README 생성
+    const contentNote = contentConfig
+      ? '\n## Custom Content\n\nThis project uses custom content from `content.yaml`.\n'
+      : '';
+
     const readme = `# ${name}
 
 This project was cloned from: ${scrapeResult.metadata.url}
@@ -238,10 +281,10 @@ pnpm dev
 ## Components
 
 ${components.map(c => `- \`${c}\``).join('\n')}
-
+${contentNote}
 ## Generated with
 
-[@anthropic/clone-website](https://github.com/anthropics/clone-website)
+[@oct7/clone-website](https://github.com/oct7/clone-website)
 `;
     fs.writeFileSync(path.join(projectDir, 'README.md'), readme);
 

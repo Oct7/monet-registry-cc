@@ -4,7 +4,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { DOMSection, FontInfo } from '../scrape/types.js';
+import type { FontInfo } from '../scrape/types.js';
+import type { TextReplacement } from '../content/types.js';
 
 export interface GenerateOptions {
   name: string;
@@ -21,6 +22,10 @@ export interface GenerateOptions {
   };
   sourceUrl?: string;
   sectionIndex?: number;
+  /** Custom content code to include in component */
+  customContent?: string;
+  /** Text replacements to apply */
+  textReplacements?: TextReplacement[];
 }
 
 export interface GenerateResult {
@@ -33,11 +38,41 @@ export interface GenerateResult {
 /**
  * 컴포넌트 기본 템플릿 생성
  */
-function generateComponentTemplate(name: string, category: string): string {
+function generateComponentTemplate(
+  name: string,
+  category: string,
+  customContent?: string
+): string {
   const componentName = name
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join('');
+
+  // If custom content is provided, use it
+  const contentBlock = customContent
+    ? `// Content from content.yaml
+${customContent}
+
+const CONTENT = {
+  headline: content.heading || "Your Headline Here",
+  subheadline: content.subheading || "Your subheadline text goes here.",
+  body: content.body || "",
+  cta: {
+    primary: { label: content.ctaText || "Get Started", href: content.ctaLink || "#" },
+    secondary: { label: "Learn More", href: "#" },
+  },
+  items: content.items || [],
+} as const;`
+    : `const CONTENT = {
+  headline: "Your Headline Here",
+  subheadline: "Your subheadline text goes here.",
+  body: "",
+  cta: {
+    primary: { label: "Get Started", href: "#" },
+    secondary: { label: "Learn More", href: "#" },
+  },
+  items: [] as Array<{ title?: string; description?: string; icon?: string }>,
+} as const;`;
 
   return `"use client";
 
@@ -47,19 +82,12 @@ import { motion } from "motion/react";
 // CUSTOMIZATION - Edit these values to customize the component
 // ============================================================================
 
-const CONTENT = {
-  headline: "Your Headline Here",
-  subheadline: "Your subheadline text goes here.",
-  cta: {
-    primary: { label: "Get Started", href: "#" },
-    secondary: { label: "Learn More", href: "#" },
-  },
-} as const;
+${contentBlock}
 
 const COLORS = {
-  background: "#FFFFFF",
-  text: "#1A1A1A",
-  accent: "#3B82F6",
+  background: "var(--color-background, #FFFFFF)",
+  text: "var(--color-foreground, #1A1A1A)",
+  accent: "var(--color-primary, #3B82F6)",
 } as const;
 
 // ============================================================================
@@ -90,6 +118,22 @@ export default function ${componentName}({ mode = "light" }: ${componentName}Pro
           <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
             {CONTENT.subheadline}
           </p>
+          {CONTENT.body && (
+            <p className="mt-4 text-base text-gray-500 max-w-3xl mx-auto">
+              {CONTENT.body}
+            </p>
+          )}
+          {CONTENT.items.length > 0 && (
+            <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {CONTENT.items.map((item, index) => (
+                <div key={index} className="p-6 rounded-xl bg-gray-50">
+                  {item.icon && <span className="text-3xl">{item.icon}</span>}
+                  {item.title && <h3 className="mt-4 text-xl font-semibold">{item.title}</h3>}
+                  {item.description && <p className="mt-2 text-gray-600">{item.description}</p>}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a
               href={CONTENT.cta.primary.href}
@@ -173,7 +217,7 @@ language: ${language || 'en'}
  * 컴포넌트 파일 생성
  */
 export async function generateComponent(options: GenerateOptions): Promise<GenerateResult> {
-  const { name, outputDir, sectionImage, category = 'hero' } = options;
+  const { name, outputDir, sectionImage, category = 'hero', customContent } = options;
 
   const componentDir = path.join(outputDir, name);
   const files: string[] = [];
@@ -185,7 +229,7 @@ export async function generateComponent(options: GenerateOptions): Promise<Gener
 
     // index.tsx 생성
     const indexPath = path.join(componentDir, 'index.tsx');
-    fs.writeFileSync(indexPath, generateComponentTemplate(name, category));
+    fs.writeFileSync(indexPath, generateComponentTemplate(name, category, customContent));
     files.push(indexPath);
 
     // metadata.yaml 생성

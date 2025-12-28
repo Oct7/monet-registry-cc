@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @anthropic/clone-website CLI
+ * @oct7/clone-website CLI
  *
  * Clone any website to React/Tailwind components
  */
@@ -10,6 +10,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { scrapeWebsite } from '../dist/scrape/scraper.js';
 import { generateProject } from '../dist/generate/project.js';
+import { parseContentConfig, createSampleContentFile } from '../dist/content/index.js';
 
 const program = new Command();
 
@@ -60,6 +61,20 @@ program
     }
   });
 
+// Init command - create sample content.yaml
+program
+  .command('init')
+  .description('Create a sample content.yaml file for content customization')
+  .option('-o, --output <file>', 'Output file path', 'content.yaml')
+  .action((options) => {
+    const outputPath = options.output;
+    createSampleContentFile(outputPath);
+    console.log(chalk.green(`✔ Created ${chalk.cyan(outputPath)}`));
+    console.log('');
+    console.log('Edit this file with your content, then run:');
+    console.log(`  ${chalk.dim('$')} clone-website clone https://example.com --content ${outputPath}`);
+  });
+
 program
   .command('clone <url> [name]')
   .description('Clone a website to a new React project (scrape + generate in one step)')
@@ -67,6 +82,7 @@ program
   .option('-t, --template <type>', 'Template: nextjs|vite|remix', 'vite')
   .option('-v, --viewport <type>', 'Viewport: mobile|tablet|desktop|wide|all', 'desktop')
   .option('-s, --scale <factor>', 'Device scale factor for Retina', '2')
+  .option('-c, --content <file>', 'Content config file (yaml/json) for custom content')
   .option('--no-lazy-load', 'Disable lazy-load triggering')
   .option('--install', 'Run pnpm install after creation')
   .action(async (url, name, options) => {
@@ -80,6 +96,19 @@ program
       }
     }
     console.log(chalk.bold(`\n🚀 Cloning ${chalk.cyan(url)} → ${chalk.green(name)}\n`));
+
+    // Parse content config if provided
+    let contentConfig = null;
+    if (options.content) {
+      const parseResult = await parseContentConfig(options.content);
+      if (!parseResult.success) {
+        console.error(chalk.red(`Error: ${parseResult.error}`));
+        process.exit(1);
+      }
+      contentConfig = parseResult.config;
+      console.log(chalk.dim(`Using content config: ${options.content}\n`));
+    }
+
     const spinner = ora('Scraping website...').start();
 
     try {
@@ -105,6 +134,7 @@ program
         outputDir: options.output,
         template: options.template,
         scrapeResult,
+        contentConfig,
       });
 
       if (projectResult.success) {

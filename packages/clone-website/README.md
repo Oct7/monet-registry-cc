@@ -157,6 +157,59 @@ my-project/
     └── images/
 ```
 
+## 콘텐츠 커스터마이징
+
+레퍼런스 웹사이트의 디자인은 유지하면서 자신만의 콘텐츠로 교체할 수 있습니다.
+
+### 1. content.yaml 생성
+
+```bash
+clone-website init
+```
+
+### 2. 콘텐츠 수정
+
+```yaml
+# content.yaml
+site:
+  title: "My SaaS Product"
+  brandName: "MySaaS"
+
+sections:
+  - target: hero
+    content:
+      heading: "Build faster with MySaaS"
+      subheading: "The all-in-one platform for modern teams"
+      ctaText: "Start Free Trial"
+      ctaLink: "/signup"
+
+  - target: features
+    content:
+      heading: "Why Choose Us"
+      items:
+        - title: "Lightning Fast"
+          description: "Built for speed"
+          icon: "⚡"
+        - title: "Secure"
+          description: "Enterprise-grade security"
+          icon: "🔒"
+
+textReplacements:
+  - find: "Stripe"
+    replace: "MySaaS"
+
+theme:
+  primaryColor: "#6366f1"
+```
+
+### 3. 콘텐츠 적용하여 클론
+
+```bash
+clone-website clone https://stripe.com -c content.yaml
+```
+
+결과: Stripe의 디자인 + 나의 콘텐츠!
+
 ## 특징
 
 ### 🎯 정확한 섹션 분할
